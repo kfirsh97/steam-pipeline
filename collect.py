@@ -29,5 +29,14 @@ def get_json(url, params=None):
     raise RuntimeError(f"{url} failed {ATTEMPTS} times: {problem}")
 
 
+def current_players(appid):
+    """Current player count for one game. Raises an error if Steam has no count for it."""
+    answer = get_json(PLAYERS_URL, {"appid": appid})
+    inner = answer["response"]
+    if inner["result"] != 1:
+        raise RuntimeError(f"Steam has no player count for game {appid}")
+    return inner["player_count"]
+
+
 if __name__ == "__main__":
-    get_json("https://httpbin.org/status/404")
+    print(current_players(570))
