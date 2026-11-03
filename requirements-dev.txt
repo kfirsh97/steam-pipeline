@@ -1,2 +1,3 @@
 -r requirements.txt
+-r requirements-warehouse.txt
 pytest==9.2.0

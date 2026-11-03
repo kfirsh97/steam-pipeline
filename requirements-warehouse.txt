@@ -1,0 +1,2 @@
+# Steps 2-3 (run on your computer, not in the hourly job): loading to BigQuery
+google-cloud-bigquery==3.47.0

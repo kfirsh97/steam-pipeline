@@ -3,7 +3,7 @@
 Daily data pipeline on Steam games: collects player counts, prices and discounts, loads them to BigQuery, models
 them with dbt and orchestrates with Airflow to measure how sales affect players.
 
-**Status:** step 1 of 6, collection, is running. Each run's raw data is saved on the
+**Status:** step 1 of 6, collection, runs every hour; step 2, loading to BigQuery, is built. Each run's raw data is saved on the
 [`data` branch](../../tree/data).
 
 ## Step 1: collection
@@ -32,6 +32,24 @@ The rules the collector follows:
 GitHub Actions runs both jobs ([`.github/workflows/`](.github/workflows)) and commits each run to the `data`
 branch, so the data never mixes with the code. Tests run on every push.
 
+## Step 2: loading to BigQuery
+
+`load.py` reads every run file from a clone of the `data` branch and loads four tables into the `raw` dataset:
+`players` (one row per game per hour), `top_games` (the daily top-100 with ranks), `store` (the store's answer as
+JSON text) and `failures` (every game that failed, and why).
+
+- **Raw stays raw**: values are loaded as they arrived; nested answers are kept as JSON text for dbt to unpack.
+- **Rebuilt every run** (`WRITE_TRUNCATE`): a re-run gives the same tables, never duplicates. The files are the
+  source of truth, so the tables can always be rebuilt. This also suits the BigQuery sandbox, which deletes
+  tables and partitions after 60 days.
+- **Traceable**: every row names the file it came from.
+- **No key in the repo**: it uses Application Default Credentials (`gcloud auth application-default login`).
+
+```bash
+git clone --branch data --single-branch https://github.com/kfirsh97/steam-pipeline.git store
+python load.py --data store --project <your-project-id>
+```
+
 ## Run it yourself
 
 ```bash
@@ -44,7 +62,7 @@ python collect.py players --out store
 ## Next steps
 
 1. ~~Collection~~
-2. Load the raw files into BigQuery, partitioned by day
+2. ~~Load the raw files into BigQuery~~
 3. Clean and model them with dbt, with data tests
 4. Orchestrate loading and modelling with Airflow in Docker, including backfills
 5. A dashboard, and the warehouse connected to [RowAsk](https://github.com/kfirsh97/rowask)
