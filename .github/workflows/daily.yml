@@ -1,0 +1,47 @@
+# Collect top list and store details (daily): runs collect.py and saves what it collected on the "data" branch, so data never mixes with code.
+name: Collect top list and store details (daily)
+
+on:
+  schedule:
+    - cron: "23 3 * * *"       # every day at 03:23 UTC (05:23 Israel winter, 06:23 summer)
+  workflow_dispatch:          # a "Run workflow" button on the Actions tab
+
+permissions:
+  contents: write             # to push to the data branch
+
+concurrency:
+  group: data-branch          # the hourly and daily jobs never write the data branch at the same time
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: data
+          path: store
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+      - run: pip install -r requirements.txt
+      # A run with too many failed games still saves what it got; it is marked failed only at the end.
+      - name: Collect
+        id: collect
+        run: python collect.py daily --out store || echo "failed=true" >> "$GITHUB_OUTPUT"
+      - name: Save to the data branch
+        working-directory: store
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then echo "Nothing new to save."; exit 0; fi
+          git commit -q -m "daily: $(date -u +%Y-%m-%dT%H:%MZ)"
+          for try in 1 2 3; do git pull -q --rebase && git push -q && exit 0; sleep 5; done
+          exit 1
+      - name: Fail the run if the collection failed
+        if: steps.collect.outputs.failed == 'true'
+        run: exit 1
