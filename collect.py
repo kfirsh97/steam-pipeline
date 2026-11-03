@@ -12,6 +12,7 @@ PLAYERS_URL = (
 )
 ATTEMPTS = 4
 PAUSE_S = 0.3
+TOP_URL = "https://steamspy.com/api.php"
 
 
 def get_json(url, params=None):
@@ -93,3 +94,11 @@ if __name__ == "__main__":
     records, failures = collect_players([730, 570, 440, 1])
     path = save_players(records, failures, started, "store")
     print(f"saved {len(records)} games, {len(failures)} failed -> {path}")
+
+
+def top_games():
+    """The 100 most played games of the last two weeks, by SteamSpy, as a list of game numbers."""
+    answer = get_json(TOP_URL, {"request": "top100in2weeks"})
+    appids = []
+    # ...
+    return appids
