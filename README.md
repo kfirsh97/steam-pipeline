@@ -3,7 +3,10 @@
 Daily data pipeline on Steam games: collects player counts, prices and discounts, loads them to BigQuery, models
 them with dbt and orchestrates with Airflow to measure how sales affect players.
 
-**Status:** steps 1-4 built: collection runs every hour on GitHub; loading and dbt run every morning in Airflow. Each run's raw data is saved on the
+**Status:** steps 1-5 built: collection runs every hour on GitHub; loading and dbt run every morning in Airflow;
+the dashboard updates itself.
+
+**[Live dashboard](https://datastudio.google.com/reporting/3558ee11-58dd-4977-890f-38206f217126)** - games tracked, players over time, prices and discounts, and how much of each day was actually collected. Each run's raw data is saved on the
 [`data` branch](../../tree/data).
 
 ## Step 1: collection
@@ -110,6 +113,18 @@ docker compose up -d --build    # first build takes a few minutes
 open http://localhost:8080
 ```
 
+## Step 5: the dashboard
+
+A [Data Studio report](https://datastudio.google.com/reporting/3558ee11-58dd-4977-890f-38206f217126) on
+`marts.dashboard_game_daily` (one flat row per game per day, built by dbt for the dashboard) and
+`marts.collection_coverage`. It reads BigQuery directly, so it shows the latest build without any export.
+
+- Games tracked and games on sale, players over time for the top 10, and a table of every game's peak, lowest
+  price and largest discount in the chosen dates - each aggregated with MAX or MIN, never summed across days.
+- Filters for dates, genres and on sale.
+- **Data coverage**: the share of hourly runs captured each day, next to the numbers it qualifies. A day with low
+  coverage has a lower peak only because it wasn't measured, and the dashboard says so.
+
 ## Run it yourself
 
 ```bash
@@ -125,5 +140,5 @@ python collect.py players --out store
 2. ~~Load the raw files into BigQuery~~
 3. ~~Clean and model them with dbt, with data tests~~
 4. ~~Orchestrate loading and modelling with Airflow in Docker, with catch-up~~
-5. A dashboard, and the warehouse connected to [RowAsk](https://github.com/kfirsh97/rowask)
+5. ~~A dashboard~~; next, the warehouse connected to [RowAsk](https://github.com/kfirsh97/rowask)
 6. The analysis: do discounts bring players, and for how long?
