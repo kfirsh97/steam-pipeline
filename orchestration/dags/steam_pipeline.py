@@ -55,7 +55,9 @@ def steam_pipeline():
 
     @task(execution_timeout=timedelta(minutes=2))
     def check_day_collected(data_interval_start=None):
-        result = check_day(f"{HOME}/store", data_interval_start.strftime("%Y-%m-%d"))
+        # A run started by hand may have no data interval: then it checks yesterday (UTC).
+        start = data_interval_start or datetime.now(timezone.utc) - timedelta(days=1)
+        result = check_day(f"{HOME}/store", start.strftime("%Y-%m-%d"))
         for warning in result["warnings"]:
             print(f"WARNING: {warning}")
         print(f"{result['day']}: {result['hours']} hours, store file present")
