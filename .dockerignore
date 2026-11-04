@@ -5,3 +5,4 @@ store
 warehouse/target
 warehouse/logs
 **/__pycache__
+demo/

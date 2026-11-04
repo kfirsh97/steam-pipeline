@@ -232,3 +232,4 @@ warehouse/.user.yml
 orchestration/.env
 orchestration/logs/
 *.sqlite
+demo/

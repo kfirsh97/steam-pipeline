@@ -59,6 +59,7 @@ my computer because they can wait: Airflow catches up on the days the computer w
 | Airflow UI | Listens on localhost only, so it has no login screen |
 | Airflow's database | Reachable only from the Airflow container; no port opened to the computer |
 | Project ID | In `orchestration/.env`, which git ignores |
+| The demo's push token | A fine-grained GitHub token: the rowask repo only, Contents read and write only. In `orchestration/.env`; given to git as a header, never in a URL or a log |
 | Dashboard | View-only; viewers get no access to the warehouse |
 
 ## Known limitations
@@ -78,6 +79,7 @@ my computer because they can wait: Airflow catches up on the days the computer w
 | `check_day_collected` failed in Airflow | That day's files didn't arrive: check the collection runs on GitHub |
 | `dbt_build` failed | Find the failing test in the log, run its compiled SQL in BigQuery to see the rows |
 | The computer was off for days | Nothing: Airflow runs every missed day when it comes back |
+| `refresh_demo` failed | Read its log: a 401/403 means the token expired or lacks Contents write. The warehouse is fine either way |
 | After a restart Airflow is down | `cd orchestration && docker compose up -d` |
 
 ## Next

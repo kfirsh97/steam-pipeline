@@ -31,6 +31,7 @@ services:
       PIPELINE_HOME: /opt/steam-pipeline
       PIPELINE_PYTHON: /opt/airflow/pipeline-venv/bin
       GCP_PROJECT: ${GCP_PROJECT:?set GCP_PROJECT in orchestration/.env}
+      ROWASK_TOKEN: ${ROWASK_TOKEN:-}                      # optional: lets refresh_demo push to the rowask repo
       GOOGLE_APPLICATION_CREDENTIALS: /home/airflow/.config/gcloud/application_default_credentials.json
     volumes:
       - ..:/opt/steam-pipeline                            # the repo: code, the data branch clone, dbt

@@ -2,13 +2,16 @@
 
 Every morning at 04:30 UTC (06:30 Israel in winter), for the UTC day that just ended:
 
-    pull_raw_files  ->  check_day_collected  ->  load_raw  ->  dbt_build
+    pull_raw_files  ->  check_day_collected  ->  load_raw  ->  dbt_build  ->  refresh_demo
 
 - pull_raw_files       brings the data branch clone up to date with what GitHub Actions collected
 - check_day_collected  makes sure the day's hourly files and store file arrived; if not, it fails and is
                        retried (twice, 20 minutes apart), so a late collector doesn't load an empty day
 - load_raw             load.py: rebuilds the raw tables in BigQuery from all the files
 - dbt_build            builds the staging and mart models and runs the data tests
+- refresh_demo         publish_demo.py: exports the marts to SQLite and pushes the file to the rowask repo, so the
+                       public demo (rowask.streamlit.app) answers from this morning's data. Skipped, with a
+                       warning, when ROWASK_TOKEN isn't set
 
 catchup=True: if the computer was off for three days, Airflow creates one run for each missed day when it
 comes back, oldest first, one at a time - each one checks its own day. The load and dbt build rebuild every
@@ -75,7 +78,13 @@ def steam_pipeline():
         execution_timeout=timedelta(minutes=20),
     )
 
-    pull >> check_day_collected() >> load >> build
+    demo = BashOperator(
+        task_id="refresh_demo",
+        bash_command=f"cd {HOME} && {BIN}/python publish_demo.py --project $GCP_PROJECT --work demo/rowask",
+        execution_timeout=timedelta(minutes=10),
+    )
+
+    pull >> check_day_collected() >> load >> build >> demo
 
 
 steam_pipeline()

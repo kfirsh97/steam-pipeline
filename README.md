@@ -91,7 +91,7 @@ dbt build --profiles-dir .
 just ended:
 
 ```
-pull_raw_files  ->  check_day_collected  ->  load_raw  ->  dbt_build
+pull_raw_files  ->  check_day_collected  ->  load_raw  ->  dbt_build  ->  refresh_demo
 ```
 
 - **Check before load**: `check_day_collected` fails if the day's hourly files or store file haven't arrived, and
@@ -138,6 +138,11 @@ file, so visitors can ask about the games with no access to the BigQuery project
 ```bash
 python export_sqlite.py --project "$GCP_PROJECT" --out steam.sqlite
 ```
+
+Airflow refreshes it every morning: `refresh_demo`, the DAG's last task, runs `publish_demo.py`, which exports the
+snapshot and pushes it to the rowask repo; Streamlit redeploys the demo by itself. It needs `ROWASK_TOKEN` in
+`orchestration/.env`: a fine-grained GitHub token for the rowask repo only, with Contents read and write. The
+token reaches git as a request header, so it never appears in a URL, a log or a git config.
 
 ## Run it yourself
 
