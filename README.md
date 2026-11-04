@@ -126,6 +126,19 @@ A [Data Studio report](https://datastudio.google.com/reporting/3558ee11-58dd-497
 - **Data coverage**: the share of hourly runs captured each day, next to the numbers it qualifies. A day with low
   coverage has a lower peak only because it wasn't measured, and the dashboard says so.
 
+## Step 6: ask it questions in plain language
+
+The warehouse is connected to [RowAsk](https://github.com/kfirsh97/rowask), an AI agent that turns a question in
+Hebrew or English into SQL, checks its own result and shows the query. On my computer it queries BigQuery directly
+(RowAsk's `steam` profile, with a gaming metric dictionary: peak players is a MAX, never a sum).
+
+For the [public demo](https://rowask.streamlit.app), `export_sqlite.py` copies the marts tables into one SQLite
+file, so visitors can ask about the games with no access to the BigQuery project and at no query cost:
+
+```bash
+python export_sqlite.py --project "$GCP_PROJECT" --out steam.sqlite
+```
+
 ## Run it yourself
 
 ```bash
@@ -141,5 +154,6 @@ python collect.py players --out store
 2. ~~Load the raw files into BigQuery~~
 3. ~~Clean and model them with dbt, with data tests~~
 4. ~~Orchestrate loading and modelling with Airflow in Docker, with catch-up~~
-5. ~~A dashboard~~; next, the warehouse connected to [RowAsk](https://github.com/kfirsh97/rowask)
-6. The analysis: do discounts bring players, and for how long?
+5. ~~A dashboard~~
+6. ~~The warehouse connected to [RowAsk](https://github.com/kfirsh97/rowask), and a snapshot on its public demo~~
+7. The analysis: do discounts bring players, and for how long?

@@ -36,6 +36,7 @@ my computer because they can wait: Airflow catches up on the days the computer w
 | Python environments | Airflow's, plus a separate virtualenv for `load.py` and dbt in the same image | One environment | Airflow's and dbt's dependency pins clash |
 | Data tests | Two generic tests written here (`between`, `unique_combination`) | A test package (dbt-utils) | No extra dependency, and each test is a few readable lines |
 | dbt version | 1.12 | dbt 2 | Most company projects still run v1 |
+| RowAsk's public demo | A SQLite snapshot of the marts (`export_sqlite.py`) | Connecting the demo to BigQuery | Strangers would run queries on my project, and the cloud host would need a Google key; a snapshot costs nothing and exposes nothing |
 | Dashboard | Data Studio, reading BigQuery live | Tableau Public | Tableau Public can't connect to BigQuery; it would need a manual export |
 
 ## Data quality rules
@@ -82,6 +83,5 @@ my computer because they can wait: Airflow catches up on the days the computer w
 ## Next
 
 1. The sale analysis, after two to three weeks of data: each sale's week before, during and after.
-2. The warehouse connected to [RowAsk](https://github.com/kfirsh97/rowask), with a gaming metric dictionary.
-3. An email when coverage drops, not only a warning in the log.
-4. With a billing account: partitioned tables and loading only the new day.
+2. An email when coverage drops, not only a warning in the log.
+3. With a billing account: partitioned tables and loading only the new day.
