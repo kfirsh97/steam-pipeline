@@ -7,7 +7,8 @@ them with dbt and orchestrates with Airflow to measure how sales affect players.
 the dashboard updates itself.
 
 **[Live dashboard](https://datastudio.google.com/reporting/3558ee11-58dd-4977-890f-38206f217126)** - games tracked, players over time, prices and discounts, and how much of each day was
-actually collected. Each run's raw data is saved on the [`data` branch](../../tree/data).
+actually collected. Each run's raw data is saved on the [`data` branch](../../tree/data). Why it's built this way:
+[docs/DESIGN.md](docs/DESIGN.md).
 
 ## Step 1: collection
 
