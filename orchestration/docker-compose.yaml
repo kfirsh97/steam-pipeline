@@ -1,0 +1,44 @@
+# Airflow on your computer: one database (Postgres) and one Airflow container running every Airflow part.
+# Start: docker compose up -d --build     Stop: docker compose down     Open: http://localhost:8080
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow     # reachable only by the Airflow container: no port is opened to your computer
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+
+  airflow:
+    build:
+      context: ..
+      dockerfile: orchestration/Dockerfile
+    command: standalone
+    ports:
+      - "127.0.0.1:8080:8080"        # localhost only: not reachable from other devices on your network
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/steam-pipeline/orchestration/dags
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "true"   # no login, because only this computer can open it
+      PIPELINE_HOME: /opt/steam-pipeline
+      PIPELINE_PYTHON: /opt/airflow/pipeline-venv/bin
+      GCP_PROJECT: ${GCP_PROJECT:?set GCP_PROJECT in orchestration/.env}
+      GOOGLE_APPLICATION_CREDENTIALS: /home/airflow/.config/gcloud/application_default_credentials.json
+    volumes:
+      - ..:/opt/steam-pipeline                            # the repo: code, the data branch clone, dbt
+      - ~/.config/gcloud:/home/airflow/.config/gcloud:ro  # your Google sign-in, read-only; no key file
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  airflow-db:

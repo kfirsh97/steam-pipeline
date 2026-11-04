@@ -1,0 +1,7 @@
+# Not needed to build the Airflow image (the repo is mounted at run time instead)
+.git
+.venv
+store
+warehouse/target
+warehouse/logs
+**/__pycache__

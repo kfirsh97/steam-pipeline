@@ -3,7 +3,7 @@
 Daily data pipeline on Steam games: collects player counts, prices and discounts, loads them to BigQuery, models
 them with dbt and orchestrates with Airflow to measure how sales affect players.
 
-**Status:** steps 1-3 built: collection runs every hour, loading to BigQuery and dbt models run on demand. Each run's raw data is saved on the
+**Status:** steps 1-4 built: collection runs every hour on GitHub; loading and dbt run every morning in Airflow. Each run's raw data is saved on the
 [`data` branch](../../tree/data).
 
 ## Step 1: collection
@@ -80,6 +80,36 @@ export GCP_PROJECT=<your-project-id>
 dbt build --profiles-dir .
 ```
 
+## Step 4: orchestration with Airflow
+
+[`orchestration/`](orchestration) runs Airflow in Docker on my computer. One DAG,
+[`steam_pipeline`](orchestration/dags/steam_pipeline.py), runs every morning at 04:30 UTC for the UTC day that
+just ended:
+
+```
+pull_raw_files  ->  check_day_collected  ->  load_raw  ->  dbt_build
+```
+
+- **Check before load**: `check_day_collected` fails if the day's hourly files or store file haven't arrived, and
+  Airflow retries it twice, 20 minutes apart - a late collector doesn't produce an empty day. A day with fewer
+  than 20 of 24 hours is loaded, and the missing hours are named in the log.
+- **Catch-up**: the computer isn't always on. `catchup=True` makes Airflow create one run per missed day when it
+  comes back, oldest first, one at a time.
+- **Split by what each tool does well**: collection must never miss an hour, so it runs on GitHub with an outside
+  scheduler; loading and modelling can wait for the computer, so they run in Airflow, which gives retries,
+  dependencies and catch-up. This also keeps it free: a managed Airflow costs hundreds of dollars a month.
+- **Two Python environments in one image**: Airflow's, and a separate one for `load.py` and dbt, so their
+  dependencies never clash.
+- **No secrets in the image**: the Google sign-in is mounted read-only from the computer; the UI listens on
+  localhost only.
+
+```bash
+cd orchestration
+cp .env.example .env            # then put your project ID in .env
+docker compose up -d --build    # first build takes a few minutes
+open http://localhost:8080
+```
+
 ## Run it yourself
 
 ```bash
@@ -94,6 +124,6 @@ python collect.py players --out store
 1. ~~Collection~~
 2. ~~Load the raw files into BigQuery~~
 3. ~~Clean and model them with dbt, with data tests~~
-4. Orchestrate loading and modelling with Airflow in Docker, including backfills
+4. ~~Orchestrate loading and modelling with Airflow in Docker, with catch-up~~
 5. A dashboard, and the warehouse connected to [RowAsk](https://github.com/kfirsh97/rowask)
 6. The analysis: do discounts bring players, and for how long?
