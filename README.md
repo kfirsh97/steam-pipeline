@@ -6,8 +6,8 @@ them with dbt and orchestrates with Airflow to measure how sales affect players.
 **Status:** steps 1-5 built: collection runs every hour on GitHub; loading and dbt run every morning in Airflow;
 the dashboard updates itself.
 
-**[Live dashboard](https://datastudio.google.com/reporting/3558ee11-58dd-4977-890f-38206f217126)** - games tracked, players over time, prices and discounts, and how much of each day was actually collected. Each run's raw data is saved on the
-[`data` branch](../../tree/data).
+**[Live dashboard](https://datastudio.google.com/reporting/3558ee11-58dd-4977-890f-38206f217126)** - games tracked, players over time, prices and discounts, and how much of each day was
+actually collected. Each run's raw data is saved on the [`data` branch](../../tree/data).
 
 ## Step 1: collection
 
