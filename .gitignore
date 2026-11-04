@@ -230,3 +230,4 @@ warehouse/.user.yml
 
 # Airflow
 orchestration/.env
+orchestration/logs/

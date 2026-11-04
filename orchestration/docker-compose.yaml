@@ -35,6 +35,7 @@ services:
     volumes:
       - ..:/opt/steam-pipeline                            # the repo: code, the data branch clone, dbt
       - ~/.config/gcloud:/home/airflow/.config/gcloud:ro  # your Google sign-in, read-only; no key file
+      - ./logs:/opt/airflow/logs                          # task logs on your computer, readable without Docker
     depends_on:
       postgres:
         condition: service_healthy
