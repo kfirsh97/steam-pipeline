@@ -1,0 +1,54 @@
+version: 2
+
+models:
+- name: stg_players
+  description: One row per game per collected UTC hour.
+  columns:
+  - name: appid
+    data_tests: [not_null]
+  - name: player_count
+    data_tests:
+    - not_null
+    - between:
+        arguments: {min_value: 0, max_value: 20000000}
+  - name: collected_hour
+    data_tests: [not_null]
+  data_tests:
+  - unique_combination:
+      arguments:
+        columns: [appid, collected_hour]
+- name: stg_store
+  description: One row per game per day, the store's answer unpacked. Prices in US dollars.
+  columns:
+  - name: appid
+    data_tests: [not_null]
+  - name: name
+    data_tests: [not_null]
+  - name: discount_pct
+    data_tests:
+    - between:
+        arguments: {min_value: 0, max_value: 100}
+  - name: price_final_usd
+    data_tests:
+    - between:
+        arguments: {min_value: 0, max_value: 1000}
+  data_tests:
+  - unique_combination:
+      arguments:
+        columns: [appid, collected_on]
+- name: stg_top_games
+  description: One row per game per day in SteamSpy's top 100, with its rank.
+  columns:
+  - name: rank
+    data_tests:
+    - not_null
+    - between:
+        arguments: {min_value: 1, max_value: 100}
+  data_tests:
+  - unique_combination:
+      arguments:
+        columns: [appid, collected_on]
+  - unique_combination:
+      arguments:
+        columns: [rank, collected_on]
+- {name: stg_failures, description: 'Every game that failed in a collection run, and why.'}

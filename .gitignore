@@ -221,3 +221,9 @@ __marimo__/
 .DS_Store
 store/
 .vscode/
+
+# dbt
+warehouse/target/
+warehouse/logs/
+warehouse/dbt_packages/
+warehouse/.user.yml

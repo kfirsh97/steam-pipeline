@@ -1,0 +1,20 @@
+# Step 3: cleaning and modelling the raw tables with dbt. Run from this folder: dbt build
+name: steam
+version: "1.0.0"
+profile: steam
+
+model-paths: ["models"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+
+models:
+  steam:
+    staging:
+      +materialized: view       # cheap: recomputed whenever a mart reads them
+      +schema: staging
+    marts:
+      +materialized: table      # rebuilt whole every run, like the raw tables
+      +schema: marts
+
+flags:
+  send_anonymous_usage_stats: false

@@ -1,0 +1,13 @@
+# Connection to BigQuery. No key file: it uses the same Google sign-in as load.py
+# (gcloud auth application-default login). The project ID comes from the GCP_PROJECT variable.
+steam:
+  target: dev
+  outputs:
+    dev:
+      type: bigquery
+      method: oauth
+      project: "{{ env_var('GCP_PROJECT') }}"
+      dataset: steam
+      location: US
+      threads: 4
+      job_execution_timeout_seconds: 300

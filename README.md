@@ -3,7 +3,7 @@
 Daily data pipeline on Steam games: collects player counts, prices and discounts, loads them to BigQuery, models
 them with dbt and orchestrates with Airflow to measure how sales affect players.
 
-**Status:** step 1 of 6, collection, runs every hour; step 2, loading to BigQuery, is built. Each run's raw data is saved on the
+**Status:** steps 1-3 built: collection runs every hour, loading to BigQuery and dbt models run on demand. Each run's raw data is saved on the
 [`data` branch](../../tree/data).
 
 ## Step 1: collection
@@ -32,6 +32,12 @@ The rules the collector follows:
 GitHub Actions runs both jobs ([`.github/workflows/`](.github/workflows)) and commits each run to the `data`
 branch, so the data never mixes with the code. Tests run on every push.
 
+**The scheduler was the weak point.** In the first 16 hours GitHub's own `schedule` started the hourly job 3
+times and the daily job not at all - it is best-effort and skips runs when busy. Now an outside scheduler
+([cron-job.org](https://cron-job.org)) starts both jobs on time through GitHub's `workflow_dispatch` API, with a
+fine-grained token that can only run this repo's workflows. GitHub's schedule stays as a backup: two runs in the
+same hour write the same file. Coverage is measured, not assumed (`collection_coverage` below).
+
 ## Step 2: loading to BigQuery
 
 `load.py` reads every run file from a clone of the `data` branch and loads four tables into the `raw` dataset:
@@ -50,6 +56,30 @@ git clone --branch data --single-branch https://github.com/kfirsh97/steam-pipeli
 python load.py --data store --project <your-project-id>
 ```
 
+## Step 3: dbt models
+
+[`warehouse/`](warehouse) turns the raw tables into tables ready for analysis, in two layers:
+
+| Model | One row per | What it adds |
+|---|---|---|
+| `staging.stg_players` | game per UTC hour | the hour as a timestamp; a hour collected twice keeps the later answer |
+| `staging.stg_store` | game per day | the store's JSON unpacked: price and discount in dollars, genres, release date |
+| `staging.stg_top_games` | game per day | rank, SteamSpy's owner range as a number, reviews |
+| `marts.dim_games` | game | latest store details, and when it was in the top 100 |
+| `marts.fct_game_daily` | game per day | peak and average players without the suspicious zeros, price, discount, on sale, rank |
+| `marts.collection_coverage` | day | hourly runs captured vs expected, store runs, failures |
+
+Data tests run with every build: unique keys at each table's grain, no empty keys, player counts and discounts
+in range, every daily row's game in `dim_games`. Two generic tests are written here
+([`warehouse/tests/generic/`](warehouse/tests/generic)): `between` and `unique_combination`. Coverage under 90%
+is a warning, not a failure: a missed hour is lost, but the rest of the day is good data.
+
+```bash
+cd warehouse
+export GCP_PROJECT=<your-project-id>
+dbt build --profiles-dir .
+```
+
 ## Run it yourself
 
 ```bash
@@ -63,7 +93,7 @@ python collect.py players --out store
 
 1. ~~Collection~~
 2. ~~Load the raw files into BigQuery~~
-3. Clean and model them with dbt, with data tests
+3. ~~Clean and model them with dbt, with data tests~~
 4. Orchestrate loading and modelling with Airflow in Docker, including backfills
 5. A dashboard, and the warehouse connected to [RowAsk](https://github.com/kfirsh97/rowask)
 6. The analysis: do discounts bring players, and for how long?

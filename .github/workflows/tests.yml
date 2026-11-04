@@ -16,3 +16,6 @@ jobs:
           cache: pip
       - run: pip install -r requirements-dev.txt
       - run: pytest -q
+      - name: Check the dbt project parses
+        working-directory: warehouse
+        run: GCP_PROJECT=ci dbt parse --profiles-dir .

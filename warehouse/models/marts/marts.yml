@@ -1,0 +1,39 @@
+version: 2
+
+models:
+- name: dim_games
+  description: One row per game ever tracked, with its latest store details.
+  columns:
+  - name: appid
+    data_tests: [unique, not_null]
+  - name: name
+    data_tests: [not_null]
+- name: fct_game_daily
+  description: One row per game per UTC day - players, price, discount and rank. Suspicious zeros are left out of
+    peak_players and avg_players.
+  columns:
+  - name: appid
+    data_tests:
+    - not_null
+    - relationships:
+        arguments: {to: ref('dim_games'), field: appid}
+  - name: hours_collected
+    data_tests:
+    - between:
+        arguments: {min_value: 1, max_value: 24}
+  data_tests:
+  - unique_combination:
+      arguments:
+        columns: [appid, collected_on]
+- name: collection_coverage
+  description: One row per UTC day - how many hourly runs and store runs were captured.
+  columns:
+  - name: collected_on
+    data_tests: [unique, not_null]
+  - name: coverage_pct
+    description: Hourly runs captured as a percentage of the hours expected. Below 90 is a warning, not an error
+      - a missed hour is lost for good, but the rest of the day is still good data.
+    data_tests:
+    - between:
+        arguments: {min_value: 90, max_value: 100}
+        config: {severity: warn}
