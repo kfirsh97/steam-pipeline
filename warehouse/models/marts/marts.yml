@@ -37,3 +37,12 @@ models:
     - between:
         arguments: {min_value: 90, max_value: 100}
         config: {severity: warn}
+- name: dashboard_game_daily
+  description: One row per game per UTC day with names and genres, for Looker Studio.
+  data_tests:
+  - unique_combination:
+      arguments:
+        columns: [appid, collected_on]
+  columns:
+  - name: name
+    data_tests: [not_null]
