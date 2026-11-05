@@ -5,7 +5,7 @@
 Reads every run file under <data>/raw/ (a clone of the data branch) and loads four tables into the `raw` dataset:
 
     raw.players     one row per game per hourly run: the player count as Steam answered it
-    raw.top_games   one row per game per day: SteamSpy's top-100 list, with the game's rank
+    raw.top_games   one row per game per day: the tracked top-100 list (Steam's chart; SteamSpy's before 2026-11-05)
     raw.store       one row per game per day: the store's answer (price, discount, genres) as JSON text
     raw.failures    one row per game that failed in any run, and why
 

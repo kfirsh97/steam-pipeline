@@ -12,11 +12,11 @@ def files(tmp_path, day, hours, store=True):
     for h in hours:
         p = tmp_path / "raw" / "players" / f"date={day}" / f"hour={h:02d}.json"
         p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text("{}")
+        p.write_text('{"records": [{"appid": 730}]}')
     if store:
         p = tmp_path / "raw" / "store" / f"date={day}" / "store.json"
         p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text("{}")
+        p.write_text('{"records": [{"appid": 730}]}')
     return tmp_path
 
 
@@ -35,3 +35,11 @@ def test_a_day_with_gaps_passes_and_names_the_missing_hours(tmp_path):
 def test_a_day_not_collected_yet_fails_so_airflow_retries(tmp_path, hours, store, message):
     with pytest.raises(ValueError, match=message):
         day_check.check_day(files(tmp_path, "2026-11-05", hours, store), "2026-11-05")
+
+
+def test_empty_files_count_as_missing(tmp_path):
+    files(tmp_path, "2026-11-05", [1, 2])
+    (tmp_path / "raw" / "players" / "date=2026-11-05" / "hour=02.json").write_text('{"records": []}')
+    (tmp_path / "raw" / "store" / "date=2026-11-05" / "store.json").write_text('{"records": []}')
+    with pytest.raises(ValueError, match="no store file"):
+        day_check.check_day(tmp_path, "2026-11-05")

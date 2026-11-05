@@ -37,7 +37,7 @@ my computer because they can wait: Airflow catches up on the days the computer w
 | Python environments | Airflow's, plus a separate virtualenv for `load.py` and dbt in the same image | One environment | Airflow's and dbt's dependency pins clash |
 | Data tests | Two generic tests written here (`between`, `unique_combination`) | A test package (dbt-utils) | No extra dependency, and each test is a few readable lines |
 | dbt version | 1.12 | dbt 2 | Most company projects still run v1 |
-| RowAsk's public demo | A SQLite snapshot of the marts (`export_sqlite.py`) | Connecting the demo to BigQuery | Strangers would run queries on my project, and the cloud host would need a Google key; a snapshot costs nothing and exposes nothing |
+| RowAsk's public demo | A SQLite snapshot of the marts (`export_sqlite.py`) | Connecting the demo to BigQuery | Strangers' questions would run on my project, and the cloud host would need a Google key; the snapshot exposes no access to the warehouse. (The embedded Data Studio report does read BigQuery live, with my credentials, as the public dashboard always has - a few MB a day, well inside the free query quota) |
 | Dashboard | Data Studio, reading BigQuery live | Tableau Public | Tableau Public can't connect to BigQuery; it would need a manual export |
 
 ## Data quality rules
@@ -45,10 +45,16 @@ my computer because they can wait: Airflow catches up on the days the computer w
 - **One failed game doesn't stop the others**: failures are saved with the run, and the run fails only above 20%.
 - **Retries** with 1s, 2s, 4s waits on timeouts, 429 and 5xx; never on 404.
 - **Safe to re-run** at every step: files are named by the UTC hour or day, tables are replaced, never appended.
+  A second run in the same hour keeps whichever file has more real counts; a second daily run adds to the first.
+- **Only finished days in the marts**: the current UTC day appears once it is over, so a partial day's low peak is
+  never read as a real one. `full_day` marks game-days with at least 20 usable hours.
+- **Unknown is not false**: `on_sale` is NULL when there was no store answer that day, not "full price".
+- **A list that fails doesn't switch tracking**: if Steam's chart fails, the last saved list is kept and the run is
+  marked failed; SteamSpy is used only with no saved list.
 - **A zero is suspicious, not dropped**: on 2026-11-03 Steam answered "success, 0 players" for Counter-Strike 2 for
   about two hours while it had close to a million. Zeros are kept and marked; the daily facts leave them out.
-- **Coverage is measured, not assumed**: `collection_coverage` counts the hours captured per day, and a day under
-  90% is a dbt warning and a bar on the dashboard.
+- **Coverage is measured, not assumed**: `collection_coverage` counts the hours captured on every finished day (a
+  day with no run is 0%, not missing), and a day under 90% is a dbt warning and a bar on the dashboard.
 - **Dashboard numbers are never summed across days**: peak and discount use MAX, price uses MIN.
 
 ## Security
@@ -59,7 +65,7 @@ my computer because they can wait: Airflow catches up on the days the computer w
 | The scheduler's token | A fine-grained GitHub token: this repo only, Actions read and write only. Stored only in cron-job.org; expires 2027-11-03 |
 | Airflow UI | Listens on localhost only, so it has no login screen |
 | Airflow's database | Reachable only from the Airflow container; no port opened to the computer |
-| Project ID | In `orchestration/.env`, which git ignores |
+| Project ID | Not a secret (it grants nothing without a sign-in); it appears in usage examples. Airflow reads it from `orchestration/.env` |
 | The demo's push token | A fine-grained GitHub token: the rowask repo only, Contents read and write only. In `orchestration/.env`; given to git as a header, never in a URL or a log |
 | Dashboard | View-only; viewers get no access to the warehouse |
 
@@ -68,6 +74,12 @@ my computer because they can wait: Airflow catches up on the days the computer w
 - The first two days are partial: 2 of 24 hours on 2026-11-03, most of the morning missing on 2026-11-04.
 - Only players connected to Steam are counted.
 - The tracked list follows Steam's top 100, so a game that drops out stops being collected.
+- **2026-11-05 is a break in the series**: the list switched from SteamSpy's to Steam's chart that day and 56 games
+  changed, so that day is partial for them, and set-wide averages and ranks aren't comparable across it.
+- One price reading per day (at 00:15 UTC): a sale that starts later that day shows from the next day.
+- On BigQuery, RowAsk's read-only validator is the only guard, and it runs with my own sign-in. The next step is a
+  viewer-only service account limited to the marts dataset.
+- No alert yet when the DAG fails or the warehouse is stale: the Airflow UI and dbt's warnings show it.
 - The scheduler's token expires on 2027-11-03; after that only GitHub's unreliable schedule is left.
 - GitHub disables scheduled workflows after 60 days without a commit; the outside scheduler isn't affected.
 

@@ -14,7 +14,7 @@ actually collected. Each run's raw data is saved on the [`data` branch](../../tr
 
 | Job | When | What it saves |
 |---|---|---|
-| `python collect.py players` | every hour | how many people play each of the 100 tracked games right now |
+| `python collect.py players` | every hour | how many people play each tracked game right now (Steam has no count for a few apps) |
 | `python collect.py daily` | every day | Steam's top-100 most played list, and each game's price, discount, genres and release date |
 
 Sources, all public and free: Steam's most-played chart (`ISteamChartsService`: which 100 games to track), the
@@ -40,8 +40,10 @@ branch, so the data never mixes with the code. Tests run on every push.
 **The scheduler was the weak point.** In the first 16 hours GitHub's own `schedule` started the hourly job 3
 times and the daily job not at all - it is best-effort and skips runs when busy. Now an outside scheduler
 ([cron-job.org](https://cron-job.org)) starts both jobs on time through GitHub's `workflow_dispatch` API, with a
-fine-grained token that can only run this repo's workflows. GitHub's schedule stays as a backup: two runs in the
-same hour write the same file. Coverage is measured, not assumed (`collection_coverage` below).
+fine-grained token that can only run this repo's workflows. GitHub's schedule stays as a backup: a second run in the
+same hour replaces the file only if it has more real counts (on 2026-11-05 a late backup run with 30 zeros had
+replaced a good file), and the backup daily run does nothing if the day is already collected. Coverage is
+measured, not assumed (`collection_coverage` below).
 
 ## Step 2: loading to BigQuery
 
@@ -67,12 +69,12 @@ python load.py --data store --project <your-project-id>
 
 | Model | One row per | What it adds |
 |---|---|---|
-| `staging.stg_players` | game per UTC hour | the hour as a timestamp; a hour collected twice keeps the later answer |
+| `staging.stg_players` | game per UTC hour | the hour as a timestamp; one file per hour, so one answer per game per hour |
 | `staging.stg_store` | game per day | the store's JSON unpacked: price and discount in dollars, genres, release date |
 | `staging.stg_top_games` | game per day | rank, which list it came from (Steam or SteamSpy), the list's peak players |
 | `marts.dim_games` | game | latest store details, and when it was in the top 100 |
 | `marts.fct_game_daily` | game per day | peak and average players without the suspicious zeros, price, discount, on sale, rank |
-| `marts.collection_coverage` | day | hourly runs captured vs expected, store runs, failures |
+| `marts.collection_coverage` | day | hourly runs captured out of 24 (and without suspicious zeros), store runs, failures; every finished day, even one with no run |
 
 Data tests run with every build: unique keys at each table's grain, no empty keys, player counts and discounts
 in range, every daily row's game in `dim_games`. Two generic tests are written here

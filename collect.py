@@ -5,8 +5,8 @@ Two jobs, scheduled in .github/workflows/:
     python collect.py players   every hour: how many people play each tracked game right now
     python collect.py daily     once a day: the top-100 list, and each game's price, discount and genres
 
-Which games: Steam's own list of the 100 most played games (ISteamChartsService). SteamSpy is the fallback when
-Steam's list doesn't answer. SteamSpy was the first source, but in the first three days its answer never changed
+Which games: Steam's own list of the 100 most played games (ISteamChartsService). If it doesn't answer, the
+last saved list is kept (and the run is marked failed); SteamSpy only when there is no saved list at all. SteamSpy was the first source, but in the first three days its answer never changed
 (the same numbers, old names like "Counter-Strike: Global Offensive") and it left out Dota 2 - one of the most
 played games on Steam.
 
@@ -14,8 +14,9 @@ Rules a collector needs:
 - Nothing collected today can be collected later, so one failed game doesn't stop the others. Failures are
   saved in the same file, and the run fails (red in GitHub Actions) only if more than MAX_FAILED_SHARE failed.
 - Requests are retried on timeouts, 429 and 5xx, and spaced out to stay under each source's rate limit.
-- A file is named by the UTC hour or day it holds, so re-running the same hour replaces it instead of adding a
-  second copy, and it is written in one step, so a crash never leaves half a file.
+- A file is named by the UTC hour or day it holds, so a re-run never adds a second copy, and it is written in one
+  step, so a crash never leaves half a file. A second run in the same hour replaces the file only if it has more
+  real counts; a second daily run adds its store answers to the first run's instead of dropping games.
 - A player count of 0 is kept but marked suspicious: Steam sometimes answers 0 with "success" for a game that
   has hundreds of thousands of players (seen for Counter-Strike 2 on 2026-11-03).
 """
@@ -65,14 +66,23 @@ def get_json(url, params=None):
     raise RuntimeError(f"{url} failed {ATTEMPTS} times: {problem}")
 
 
-def top_games():
-    """The 100 most played games, most played first: Steam's own list, or SteamSpy's when Steam's fails.
-    Each game: {"appid": 570, "rank": 2, "source": "steam", ...} with the source's other fields."""
+MIN_LIST = 50  # a "top 100" shorter than this is treated as a failed answer
+
+
+def top_games(out=None):
+    """(games, fallback) - the 100 most played games, most played first, and why a fallback was used (or None).
+    Steam's own chart first. If it fails or is too short: the last list saved under out (yesterday's, usually),
+    and only with no saved list SteamSpy's, which is frozen and misses games. A fallback still collects the day,
+    but the run is marked failed, so someone looks."""
     try:
-        return steam_top_games()
-    except Exception as error:  # the list decides what is collected all day: a fallback beats no list
-        print(f"WARNING: Steam's most-played list failed ({error}); using SteamSpy's", file=sys.stderr)
-        return steamspy_top_games()
+        return steam_top_games(), None
+    except Exception as error:
+        reason = f"Steam's most-played list failed ({error})"
+    saved = sorted(Path(out).glob("raw/top_games/date=*/top_games.json")) if out else []
+    if saved:
+        games = json.loads(saved[-1].read_text())["games"]
+        return games, f"{reason}; kept the list saved in {saved[-1].parent.name}"
+    return steamspy_top_games(), f"{reason}; used SteamSpy's list (no saved list yet)"
 
 
 def steam_top_games():
@@ -82,6 +92,8 @@ def steam_top_games():
     if not ranks:
         raise RuntimeError("Steam returned no ranks")
     games = sorted(({**r, "appid": int(r["appid"]), "source": "steam"} for r in ranks), key=lambda g: g["rank"])
+    if len(games) < MIN_LIST:
+        raise RuntimeError(f"Steam's list has only {len(games)} games")
     return games[:100]
 
 
@@ -157,7 +169,12 @@ def tracked_games(out):
     saved = sorted(Path(out).glob("raw/top_games/date=*/top_games.json"))
     if saved:
         return [game["appid"] for game in json.loads(saved[-1].read_text())["games"]]
-    return [game["appid"] for game in top_games()]
+    return [game["appid"] for game in top_games()[0]]
+
+
+def usable(payload):
+    """How many real player counts a saved hour holds (answers, without the suspicious zeros)."""
+    return sum(1 for r in payload["records"] if not r.get("suspicious"))
 
 
 def run_players(out):
@@ -168,7 +185,13 @@ def run_players(out):
     for record in records:
         record["suspicious"] = record["answer"] == 0
     path = Path(out) / "raw" / "players" / f"date={started:%Y-%m-%d}" / f"hour={started:%H}.json"
-    save(path, {"started_at": started.isoformat(timespec="seconds"), "records": records, "failures": failures})
+    payload = {"started_at": started.isoformat(timespec="seconds"), "records": records, "failures": failures}
+    # Two runs in one hour (the outside scheduler and GitHub's own): keep whichever file has more real counts,
+    # so a late run with many zeros or failures never replaces a good one.
+    if path.exists() and usable(json.loads(path.read_text())) >= usable(payload):
+        print(f"{path.name}: an earlier run this hour has as many real counts or more - kept it")
+    else:
+        save(path, payload)
     check("players", len(appids), failures)
     return path, len(records), len(failures)
 
@@ -177,14 +200,25 @@ def run_daily(out):
     """Today's top-100 list, then every listed game's store details, under raw/top_games and raw/store (UTC day)."""
     started = datetime.now(timezone.utc)
     day = f"date={started:%Y-%m-%d}"
-    games = top_games()
-    save(Path(out) / "raw" / "top_games" / day / "top_games.json",
-         {"collected_at": started.isoformat(timespec="seconds"), "games": games})
+    games, fallback = top_games(out)
+    listed = {"collected_at": started.isoformat(timespec="seconds"), "games": games}
+    if fallback:
+        listed["fallback"] = fallback
+    save(Path(out) / "raw" / "top_games" / day / "top_games.json", listed)
     appids = [game["appid"] for game in games]
     records, failures = collect(appids, store_details, STORE_PAUSE_S)
     path = Path(out) / "raw" / "store" / day / "store.json"
+    # A second run the same day adds to the first: its answers replace the earlier ones game by game, and games
+    # only the earlier run had (it followed another list, or this run failed them) keep their answers.
+    if path.exists():
+        earlier = json.loads(path.read_text())
+        fresh = {r["appid"] for r in records}
+        records += [r for r in earlier["records"] if r["appid"] not in fresh]
+        failures = [f for f in failures if f["appid"] not in {r["appid"] for r in records}]
     save(path, {"started_at": started.isoformat(timespec="seconds"), "records": records, "failures": failures})
     check("store", len(appids), failures)
+    if fallback:
+        raise RuntimeError(f"collected with a fallback list: {fallback}")
     return path, len(records), len(failures)
 
 
@@ -192,7 +226,14 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="Collect raw Steam data.")
     parser.add_argument("job", choices=["players", "daily"])
     parser.add_argument("--out", default="store", help="the folder that holds raw/")
+    parser.add_argument("--if-missing", action="store_true",
+                        help="daily only: do nothing if today's store file already exists (the backup schedule)")
     args = parser.parse_args(argv)
+    if args.job == "daily" and args.if_missing:
+        today = Path(args.out) / "raw" / "store" / f"date={datetime.now(timezone.utc):%Y-%m-%d}" / "store.json"
+        if today.exists():
+            print(f"daily: {today} already exists - the backup run has nothing to do")
+            return 0
     run = run_players if args.job == "players" else run_daily
     try:
         path, saved, failed = run(args.out)

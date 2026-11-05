@@ -4,7 +4,7 @@ Every morning at 04:30 UTC (06:30 Israel in winter), for the UTC day that just e
 
     pull_raw_files  ->  check_day_collected  ->  load_raw  ->  dbt_build  ->  refresh_demo
 
-- pull_raw_files       brings the data branch clone up to date with what GitHub Actions collected
+- pull_raw_files       brings the code (main) and the data branch clone up to date
 - check_day_collected  makes sure the day's hourly files and store file arrived; if not, it fails and is
                        retried (twice, 20 minutes apart), so a late collector doesn't load an empty day
 - load_raw             load.py: rebuilds the raw tables in BigQuery from all the files
@@ -46,10 +46,12 @@ DATA_BRANCH = "https://github.com/kfirsh97/steam-pipeline.git"
     doc_md=__doc__,
 )
 def steam_pipeline():
+    # The code is pulled too, so a fix pushed to main is what this morning's run uses (it fails, rather than
+    # running old code, if the local checkout has changes of its own).
     pull = BashOperator(
         task_id="pull_raw_files",
         bash_command=(
-            f"cd {HOME} && "
+            f"cd {HOME} && git pull --ff-only -q && "
             f"if [ -d store/.git ]; then git -C store pull --ff-only -q; "
             f"else git clone -q --branch data --single-branch {DATA_BRANCH} store; fi"
         ),
@@ -58,6 +60,9 @@ def steam_pipeline():
 
     @task(execution_timeout=timedelta(minutes=2))
     def check_day_collected(data_interval_start=None):
+        import subprocess
+        # Pull again here: when this task is retried 20 minutes later, a late collector's files are then seen.
+        subprocess.run(["git", "-C", f"{HOME}/store", "pull", "--ff-only", "-q"], check=True)
         # A run started by hand may have no data interval: then it checks yesterday (UTC).
         start = data_interval_start or datetime.now(timezone.utc) - timedelta(days=1)
         result = check_day(f"{HOME}/store", start.strftime("%Y-%m-%d"))

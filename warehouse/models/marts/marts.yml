@@ -21,12 +21,20 @@ models:
     data_tests:
     - between:
         arguments: {min_value: 1, max_value: 24}
+  - name: on_sale
+    description: True when discounted, false at full price, NULL when there was no store answer that day (unknown).
+  - name: has_store_data
+    data_tests: [not_null]
+  - name: full_day
+    description: At least 20 usable hourly counts. Compare players across days only on full days.
+    data_tests: [not_null]
   data_tests:
   - unique_combination:
       arguments:
         columns: [appid, collected_on]
 - name: collection_coverage
-  description: One row per UTC day - how many hourly runs and store runs were captured.
+  description: One row per finished UTC day since collection began (a calendar, so a day with no run is 0%) - how
+    many hourly runs and store runs were captured. valid_coverage_pct also leaves out suspicious zeros.
   columns:
   - name: collected_on
     data_tests: [unique, not_null]

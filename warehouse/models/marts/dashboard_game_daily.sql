@@ -9,9 +9,12 @@ select
     d.peak_players,
     d.avg_players,
     d.hours_valid,
+    d.full_day,
     d.price_final_usd,
     d.discount_pct,
+    d.has_store_data,
     d.on_sale,
-    d.top_100_rank
+    d.top_100_rank,
+    d.list_source
 from {{ ref('fct_game_daily') }} as d
 join {{ ref('dim_games') }} as g using (appid)

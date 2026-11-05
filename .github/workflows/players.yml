@@ -33,6 +33,7 @@ jobs:
         id: collect
         run: python collect.py players --out store || echo "failed=true" >> "$GITHUB_OUTPUT"
       - name: Save to the data branch
+        id: save
         working-directory: store
         run: |
           git config user.name "github-actions[bot]"
@@ -42,6 +43,14 @@ jobs:
           git commit -q -m "players: $(date -u +%Y-%m-%dT%H:%MZ)"
           for try in 1 2 3; do git pull -q --rebase && git push -q && exit 0; sleep 5; done
           exit 1
+      # If the push failed three times, the files would vanish with the runner: keep them as a download for 7 days.
+      - name: Keep the files if they could not be saved
+        if: failure() && steps.save.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsaved-raw-files
+          path: store/raw
+          retention-days: 7
       - name: Fail the run if the collection failed
         if: steps.collect.outputs.failed == 'true'
         run: exit 1

@@ -3,7 +3,8 @@ name: Collect top list and store details (daily)
 
 on:
   schedule:
-    - cron: "23 3 * * *"       # every day at 03:23 UTC (05:23 Israel winter, 06:23 summer)
+    - cron: "45 1 * * *"       # a backup only: cron-job.org starts the real run at 00:15 UTC. GitHub may start this
+                               # one hours late, so it runs only if today's store file is missing (--if-missing)
   workflow_dispatch:          # a "Run workflow" button on the Actions tab
 
 permissions:
@@ -31,8 +32,11 @@ jobs:
       # A run with too many failed games still saves what it got; it is marked failed only at the end.
       - name: Collect
         id: collect
-        run: python collect.py daily --out store || echo "failed=true" >> "$GITHUB_OUTPUT"
+        run: |
+          backup=""; if [ "${{ github.event_name }}" = "schedule" ]; then backup="--if-missing"; fi
+          python collect.py daily --out store $backup || echo "failed=true" >> "$GITHUB_OUTPUT"
       - name: Save to the data branch
+        id: save
         working-directory: store
         run: |
           git config user.name "github-actions[bot]"
@@ -42,6 +46,14 @@ jobs:
           git commit -q -m "daily: $(date -u +%Y-%m-%dT%H:%MZ)"
           for try in 1 2 3; do git pull -q --rebase && git push -q && exit 0; sleep 5; done
           exit 1
+      # If the push failed three times, the files would vanish with the runner: keep them as a download for 7 days.
+      - name: Keep the files if they could not be saved
+        if: failure() && steps.save.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsaved-raw-files
+          path: store/raw
+          retention-days: 7
       - name: Fail the run if the collection failed
         if: steps.collect.outputs.failed == 'true'
         run: exit 1

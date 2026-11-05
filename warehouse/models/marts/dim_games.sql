@@ -1,5 +1,6 @@
 -- One row per game ever tracked: its latest store details, and when it was in the top 100.
--- The name comes from the store, which is up to date ("Counter-Strike 2"); SteamSpy's can be old.
+-- The name comes from the store, which is up to date ("Counter-Strike 2"); SteamSpy's can be old. Steam's chart
+-- has no names, so a game whose store answer failed is called 'App <appid>' rather than failing the build.
 with latest_store as (
     select *
     from {{ ref('stg_store') }}
@@ -21,7 +22,7 @@ top_list as (
 
 select
     t.appid,
-    coalesce(s.name, t.steamspy_name) as name,
+    coalesce(s.name, t.steamspy_name, concat('App ', cast(t.appid as string))) as name,  -- never NULL
     s.type,
     s.is_free,
     s.genres,

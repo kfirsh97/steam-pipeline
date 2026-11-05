@@ -10,6 +10,8 @@ Rules:
   from the environment and handed to git as a request header, never put in a URL or a command line, so it doesn't
   appear in Airflow's logs or in the clone's git config.
 - No token set: nothing is pushed, the task says so and succeeds - the pipeline itself doesn't depend on the demo.
+- The snapshot is checked before it is pushed (every table there, with rows): a broken export never reaches the
+  public demo, which redeploys on every push.
 - Nothing changed: no commit. If someone pushed to rowask meanwhile, the clone is reset to their version and the
   file is committed again on top, once.
 """
@@ -64,7 +66,26 @@ def commit_file(work, snapshot, message, env):
     return True
 
 
-def publish(repo, work, export, token, message="Steam sample: daily snapshot of the warehouse"):
+REQUIRED = {"dashboard_game_daily": 50, "fct_game_daily": 50, "dim_games": 50, "collection_coverage": 1}
+
+
+def validate(path):
+    """Refuse a snapshot the demo can't use: a missing table, or one with fewer rows than REQUIRED."""
+    import sqlite3
+    con = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    try:
+        tables = {t for (t,) in con.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+        for table, minimum in REQUIRED.items():
+            if table not in tables:
+                raise ValueError(f"the snapshot has no {table} table")
+            rows = con.execute(f'SELECT COUNT(*) FROM "{table}"').fetchone()[0]
+            if rows < minimum:
+                raise ValueError(f"the snapshot's {table} has {rows} rows (at least {minimum} expected)")
+    finally:
+        con.close()
+
+
+def publish(repo, work, export, token, message="Steam sample: daily snapshot of the warehouse", check=validate):
     """export(path) writes the SQLite file. Returns 'pushed', 'unchanged' or 'no token'."""
     if not token:
         return "no token"
@@ -72,6 +93,7 @@ def publish(repo, work, export, token, message="Steam sample: daily snapshot of 
     fresh_clone(repo, work, env)
     snapshot = Path(work).parent / "steam.sqlite"
     export(snapshot)
+    check(snapshot)  # raises: the public demo keeps yesterday's file rather than getting a broken one
     if not commit_file(work, snapshot, message, env):
         return "unchanged"
     try:
