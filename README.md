@@ -15,11 +15,12 @@ actually collected. Each run's raw data is saved on the [`data` branch](../../tr
 | Job | When | What it saves |
 |---|---|---|
 | `python collect.py players` | every hour | how many people play each of the 100 tracked games right now |
-| `python collect.py daily` | every day | SteamSpy's top-100 list, and each game's price, discount, genres and release date |
+| `python collect.py daily` | every day | Steam's top-100 most played list, and each game's price, discount, genres and release date |
 
-Sources, all public and free: [SteamSpy](https://steamspy.com) (which games to track: the 100 most played in the
-last two weeks), the [Steam Web API](https://partner.steamgames.com/doc/webapi/ISteamUserStats) (current players)
-and the Steam store (prices).
+Sources, all public and free: Steam's most-played chart (`ISteamChartsService`: which 100 games to track), the
+[Steam Web API](https://partner.steamgames.com/doc/webapi/ISteamUserStats) (current players) and the Steam store
+(prices). [SteamSpy](https://steamspy.com) is the fallback list: it was the first source, but its answer didn't
+change once in three days and it left out Dota 2, so Steam's own chart replaced it on 2026-11-05.
 
 The rules the collector follows:
 
@@ -68,7 +69,7 @@ python load.py --data store --project <your-project-id>
 |---|---|---|
 | `staging.stg_players` | game per UTC hour | the hour as a timestamp; a hour collected twice keeps the later answer |
 | `staging.stg_store` | game per day | the store's JSON unpacked: price and discount in dollars, genres, release date |
-| `staging.stg_top_games` | game per day | rank, SteamSpy's owner range as a number, reviews |
+| `staging.stg_top_games` | game per day | rank, which list it came from (Steam or SteamSpy), the list's peak players |
 | `marts.dim_games` | game | latest store details, and when it was in the top 100 |
 | `marts.fct_game_daily` | game per day | peak and average players without the suspicious zeros, price, discount, on sale, rank |
 | `marts.collection_coverage` | day | hourly runs captured vs expected, store runs, failures |

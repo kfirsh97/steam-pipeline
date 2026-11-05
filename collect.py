@@ -5,6 +5,11 @@ Two jobs, scheduled in .github/workflows/:
     python collect.py players   every hour: how many people play each tracked game right now
     python collect.py daily     once a day: the top-100 list, and each game's price, discount and genres
 
+Which games: Steam's own list of the 100 most played games (ISteamChartsService). SteamSpy is the fallback when
+Steam's list doesn't answer. SteamSpy was the first source, but in the first three days its answer never changed
+(the same numbers, old names like "Counter-Strike: Global Offensive") and it left out Dota 2 - one of the most
+played games on Steam.
+
 Rules a collector needs:
 - Nothing collected today can be collected later, so one failed game doesn't stop the others. Failures are
   saved in the same file, and the run fails (red in GitHub Actions) only if more than MAX_FAILED_SHARE failed.
@@ -27,7 +32,8 @@ import requests
 
 # Sources
 PLAYERS_URL = "https://api.steampowered.com/ISteamUserStats/GetNumberOfCurrentPlayers/v1/"
-TOP_URL = "https://steamspy.com/api.php"
+CHARTS_URL = "https://api.steampowered.com/ISteamChartsService/GetMostPlayedGames/v1/"
+TOP_URL = "https://steamspy.com/api.php"  # the fallback list
 STORE_URL = "https://store.steampowered.com/api/appdetails"
 
 ATTEMPTS = 4
@@ -60,14 +66,33 @@ def get_json(url, params=None):
 
 
 def top_games():
-    """The 100 most played games of the last two weeks, by SteamSpy, most played first.
-    Each game: {"appid": 730, "name": "Counter-Strike 2", ...} with SteamSpy's other fields."""
+    """The 100 most played games, most played first: Steam's own list, or SteamSpy's when Steam's fails.
+    Each game: {"appid": 570, "rank": 2, "source": "steam", ...} with the source's other fields."""
+    try:
+        return steam_top_games()
+    except Exception as error:  # the list decides what is collected all day: a fallback beats no list
+        print(f"WARNING: Steam's most-played list failed ({error}); using SteamSpy's", file=sys.stderr)
+        return steamspy_top_games()
+
+
+def steam_top_games():
+    """Steam's most played games by peak players at once: rank, appid, peak_in_game, last_week_rank."""
+    answer = get_json(CHARTS_URL)
+    ranks = (answer.get("response") or {}).get("ranks") if isinstance(answer, dict) else None
+    if not ranks:
+        raise RuntimeError("Steam returned no ranks")
+    games = sorted(({**r, "appid": int(r["appid"]), "source": "steam"} for r in ranks), key=lambda g: g["rank"])
+    return games[:100]
+
+
+def steamspy_top_games():
+    """SteamSpy's 100 most played games of the last two weeks, in its order."""
     answer = get_json(TOP_URL, {"request": "top100in2weeks"})
     if not isinstance(answer, dict) or not answer:
         raise RuntimeError("SteamSpy returned no games")
     games = []
     for key in answer:  # the keys are game numbers written as text, e.g. "730"
-        games.append({**answer[key], "appid": int(key)})
+        games.append({**answer[key], "appid": int(key), "source": "steamspy"})
     return games
 
 

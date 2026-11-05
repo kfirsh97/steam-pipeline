@@ -37,7 +37,7 @@ models:
       arguments:
         columns: [appid, collected_on]
 - name: stg_top_games
-  description: One row per game per day in SteamSpy's top 100, with its rank.
+  description: One row per game per day in the top-100 list (Steam's most-played chart; SteamSpy's before 2026-11-05), with its rank.
   columns:
   - name: rank
     data_tests:

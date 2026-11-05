@@ -15,7 +15,7 @@ public dashboard.
 ```
                  always on (cloud)                          |  my computer        |  Google Cloud
 cron-job.org --> GitHub Actions: collect.py --> data branch --> Airflow in Docker --> BigQuery raw --> dbt --> Data Studio
-   (on time)     (Steam Web API, store, SteamSpy)  (one file      (pull, check, load,                 (staging,
+   (on time)     (Steam Web API, store, charts)    (one file      (pull, check, load,                 (staging,
                                                     per run)        build, catch up)                  marts, tests)
 ```
 
@@ -31,6 +31,7 @@ my computer because they can wait: Airflow catches up on the days the computer w
 | Where loading and dbt run | Airflow 3.3 in Docker on my computer | Managed Airflow (Cloud Composer, MWAA) | Managed Airflow costs hundreds of dollars a month; this work can wait, and catch-up covers the gaps |
 | Where raw files live | A `data` branch in the repo | A cloud bucket | Free, public, full history; the data is a few MB a day |
 | How tables are loaded | Each table rebuilt from all files every run (`WRITE_TRUNCATE`) | Loading one day into a partition | The BigQuery sandbox deletes partitions after 60 days, and the data is small enough to rebuild in seconds. The files are the source of truth |
+| Which games to track | Steam's own most-played chart, SteamSpy as fallback | SteamSpy's top 100 only | SteamSpy's answer was identical for three days, kept old names, and had no Dota 2; a source that stops updating is checked by comparing days, not assumed fresh |
 | BigQuery account | The free sandbox, no credit card | A billing account | Its limits (60-day expiry, no DML) don't matter when every table is rebuilt from files |
 | Airflow schedule | `CronDataIntervalTimetable` | A plain cron string | In Airflow 3 a plain cron string starts and ends the interval at the run time; an interval timetable makes each run's `data_interval_start` the UTC day it checks |
 | Python environments | Airflow's, plus a separate virtualenv for `load.py` and dbt in the same image | One environment | Airflow's and dbt's dependency pins clash |
@@ -66,7 +67,7 @@ my computer because they can wait: Airflow catches up on the days the computer w
 
 - The first two days are partial: 2 of 24 hours on 2026-11-03, most of the morning missing on 2026-11-04.
 - Only players connected to Steam are counted.
-- The tracked list follows SteamSpy's top 100, so a game that drops out stops being collected.
+- The tracked list follows Steam's top 100, so a game that drops out stops being collected.
 - The scheduler's token expires on 2027-11-03; after that only GitHub's unreliable schedule is left.
 - GitHub disables scheduled workflows after 60 days without a commit; the outside scheduler isn't affected.
 

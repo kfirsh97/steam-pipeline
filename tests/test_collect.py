@@ -27,12 +27,14 @@ def no_waiting(monkeypatch):
     monkeypatch.setattr(collect.time, "sleep", lambda s: None)
 
 
-def fake_sources(monkeypatch, players=None, store=None, top=None):
+def fake_sources(monkeypatch, players=None, store=None, top=None, charts=None):
     """Answer like the three sources. players / store: {appid: answer}; a missing game gets a 404."""
     calls = []
 
     def get(url, params=None, timeout=None):
         calls.append((url, params))
+        if url == collect.CHARTS_URL:
+            return FakeResponse(200, {"response": {"ranks": charts}}) if charts else FakeResponse(404)
         if url == collect.TOP_URL:
             return FakeResponse(200, top)
         if url == collect.PLAYERS_URL:
@@ -68,7 +70,14 @@ def test_does_not_retry_a_missing_page(monkeypatch):
     assert len(calls) == 1
 
 
-def test_top_games_turns_text_keys_into_numbers_and_keeps_the_order(monkeypatch):
+def test_top_games_comes_from_steam_in_rank_order(monkeypatch):
+    fake_sources(monkeypatch, charts=[{"rank": 2, "appid": 570, "peak_in_game": 700000},
+                                      {"rank": 1, "appid": 730, "peak_in_game": 1500000}],
+                 top={"440": {"name": "Team Fortress 2"}})
+    assert [(g["appid"], g["source"]) for g in collect.top_games()] == [(730, "steam"), (570, "steam")]
+
+
+def test_top_games_falls_back_to_steamspy_with_text_keys_as_numbers(monkeypatch):
     fake_sources(monkeypatch, top={"730": {"name": "Counter-Strike 2"}, "440": {"name": "Team Fortress 2"}})
     assert [(g["appid"], g["name"]) for g in collect.top_games()] == [(730, "Counter-Strike 2"),
                                                                        (440, "Team Fortress 2")]

@@ -1,4 +1,4 @@
--- One row per game ever tracked: its latest store details, and when it was in SteamSpy's top 100.
+-- One row per game ever tracked: its latest store details, and when it was in the top 100.
 -- The name comes from the store, which is up to date ("Counter-Strike 2"); SteamSpy's can be old.
 with latest_store as (
     select *
