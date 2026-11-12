@@ -52,5 +52,12 @@ models:
       arguments:
         columns: [appid, collected_on]
   columns:
+  - name: players_vs_baseline_pct
+    description: The day's average players against the game's own average on full days without a discount, in %.
+  - name: discount_band
+    data_tests:
+    - accepted_values:
+        arguments:
+          values: ['0%', '1-24%', '25-49%', '50-74%', '75%+']
   - name: name
     data_tests: [not_null]
