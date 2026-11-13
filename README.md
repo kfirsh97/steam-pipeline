@@ -74,6 +74,7 @@ python load.py --data store --project <your-project-id>
 | `staging.stg_top_games` | game per day | rank, which list it came from (Steam or SteamSpy), the list's peak players |
 | `marts.dim_games` | game | latest store details, and when it was in the top 100 |
 | `marts.fct_game_daily` | game per day | peak and average players without the suspicious zeros, price, discount, on sale, rank |
+| `marts.sale_effect` | sale × day | every sale whose start was seen, from 7 days before to 14 after: days from the start, players vs the game's normal |
 | `marts.collection_coverage` | day | hourly runs captured out of 24 (and without suspicious zeros), store runs, failures; every finished day, even one with no run |
 
 Data tests run with every build: unique keys at each table's grain, no empty keys, player counts and discounts

@@ -61,3 +61,15 @@ models:
           values: ['0%', '1-24%', '25-49%', '50-74%', '75%+']
   - name: name
     data_tests: [not_null]
+- name: sale_effect
+  description: Every sale whose start was seen, with the 7 days before and 14 after its first discounted day.
+    For a before/during/after chart - days_from_sale_start on the x axis, AVG(players_vs_baseline_pct) on the y.
+  data_tests:
+  - unique_combination:
+      arguments:
+        columns: [appid, sale_start, collected_on]
+  columns:
+  - name: days_from_sale_start
+    data_tests:
+    - between:
+        arguments: {min_value: -7, max_value: 14}
